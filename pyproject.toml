@@ -1,0 +1,110 @@
+[project]
+name = "latte"
+version = "0.1.0"
+requires-python = "==3.11.*"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "datasets>=2.16.1",
+    "flax>=0.7.4",
+    "jax[cuda12_pip]>=0.4.6",
+    "numpy>=1.26.3",
+    "optax>=0.1.8",
+    "tqdm>=4.66.1",
+    "wandb>=0.16.2",
+    "tiktoken>=0.5.2",
+    "simple-parsing>=0.1.4",
+]
+
+[tool.pdm]
+package-type = "application"
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "pyright>=1.1.349",
+    "ipython>=8.20.0",
+    "isort>=5.13.2",
+    "flake8>=7.0.0",
+    "black>=24.1.0",
+    "autoflake>=2.2.1",
+    "ipdb>=0.13.13",
+]
+
+[[tool.pdm.source]]
+name = "jax"
+url = "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
+verify_ssl = true
+type = "find_links"
+
+[tool.pdm.scripts]
+prepare-tiny-stories = { call = "latte.datasets.tiny_stories:prepare" }
+train = { call = "latte.train:main" }
+
+# preprocess-task-mining-tasks = { call = "latte.preprocess.datasets.task_mining.tasks:main" }
+
+# Training scripts
+# train = { cmd = "accelerate launch -m latte.model.train" }
+# train-tokenizer = { call = "latte.tokenizer.train:main" }
+
+# Viewer server
+# viewer = { call = "latte.preprocess.viewer:main" }
+
+# Linting utilities
+#
+# NOTE: using a multi-line string breaks vulture's toml parsing unfortunately
+check-flake8 = "flake8 latte"
+check-isort = "isort --check --diff latte"
+check-black = "black --check latte"
+check-pyright = "pyright --warnings latte"
+check = {composite = [
+    "check-flake8",
+    "check-isort",
+    "check-black",
+    "check-pyright",
+]}
+
+fmt-autoflake = "autoflake -i -r latte"
+fmt-isort = "isort latte"
+fmt-black = "black latte"
+fmt = {composite = [
+    "fmt-autoflake",
+    "fmt-isort",
+    "fmt-black",
+]}
+
+test = "pytest latte -vv"
+
+[tool.pyright]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+]
+ignore = ["**/*_pb2.py", "**/*.#*.py"]
+deprecateTypingAliases = true
+reportFunctionMemberAccess = "error"
+reportIncompatibleMethodOverride = "error"
+reportInvalidStringEscapeSequence = "error"
+reportMissingImports = "error"
+reportPropertyTypeMismatch = "error"
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+strictListInference = false
+strictSetInference = false
+
+[tool.black]
+line-length = 100
+target_version = ["py311"]
+include = '\.pyi?$'
+exclude = '(.*_pb2\.pyi?|.git|.hypothesis|.mypy_cache|.pytest_cache|.tox|.venv|node_modules)'
+
+[tool.isort]
+skip_glob=["**/*_pb2.py", "**/*.#*.py"]
+known_third_party = ["datasets", "wandb"]
+known_first_party = ["latte"]
+multi_line_output = 3
+include_trailing_comma = true
+use_parentheses = true
+ignore_whitespace = true
+float_to_top = true
+
+# flake8 is configured in .flake8 as unfortunately it doesn't support pyproject.toml yet

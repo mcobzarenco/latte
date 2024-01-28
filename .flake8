@@ -1,0 +1,9 @@
+[flake8]
+ignore = E203,E741,W503
+max-line-length = 100
+exclude =
+  .git
+  __pycache__
+  datasets
+  node_modules
+  *_pb2.py
