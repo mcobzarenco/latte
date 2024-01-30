@@ -4,14 +4,14 @@
 
 # Latte: Latent Attention for Linear Time Transformers
 
-This repository is an implementaion of latent attention (latte) for language modelling.
+This repository is an implementation of latent attention (latte) for language modelling.
 
 ## Get started
 
 Get started by cloning the repository.
 
 We use [PDM](https://pdm.fming.dev/latest/) to manage Python packages and dependencies and use
-Python 3.10 (consider [pyenv](https://github.com/pyenv/pyenv) as a simple Python version management
+Python 3.11 (consider [pyenv](https://github.com/pyenv/pyenv) as a simple Python version management
 solution). `pdm` is a modern alternative to `pip` / `poetry`. `pdm` manages a virtualenv
 locally in the project directory itself (in a directory `.venv`).
 
