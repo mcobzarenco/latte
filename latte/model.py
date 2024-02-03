@@ -7,6 +7,7 @@ from flax import linen as nn
 from flax.linen.attention import SelfAttention
 from jax import Array
 from jax import numpy as jnp
+from jax.typing import DTypeLike
 from optax import softmax_cross_entropy_with_integer_labels
 
 
@@ -19,6 +20,8 @@ class Transformer(nn.Module):
     embedding_size: int
     context_size: int
     dropout: float = 0.0
+
+    dtype: DTypeLike = jnp.float32
 
     @nn.compact
     def __call__(  # pyright: ignore [reportIncompatibleMethodOverride]
@@ -33,10 +36,12 @@ class Transformer(nn.Module):
         token_embeddings = nn.Embed(
             num_embeddings=self.num_embeddings,
             features=self.embedding_size,
+            dtype=jnp.float32,
         )
         positional_embeddings = nn.Embed(
             num_embeddings=self.context_size,
             features=self.embedding_size,
+            dtype=jnp.float32,
         )
         x = token_embeddings(indices)  # (B, T, D)
         x = x + jnp.expand_dims(positional_embeddings.embedding[: indices.shape[1]], 0)  # (B, T, D)
@@ -48,9 +53,10 @@ class Transformer(nn.Module):
                 embedding_size=self.embedding_size,
                 context_size=self.context_size,
                 dropout=self.dropout,
+                dtype=self.dtype,
             )(x, deterministic)
 
-        x = nn.LayerNorm(use_bias=False, use_scale=False)(x)  # (B, T, D)
+        x = nn.LayerNorm(use_bias=False, use_scale=False, dtype=self.dtype)(x)  # (B, T, D)
         logits = x @ token_embeddings.embedding.T  # (B, T, V)
 
         loss = None
@@ -67,6 +73,8 @@ class TransformerBlock(nn.Module):
     context_size: int = 2000
     dropout: float = 0.0
 
+    dtype: DTypeLike = jnp.float32
+
     def attention_module(self) -> CausalLatentAttention | SelfAttention | CausalSelfAttention:
         match self.attention_type:
             case "latte":
@@ -74,12 +82,14 @@ class TransformerBlock(nn.Module):
                     num_heads=self.num_heads,
                     hidden_dim=self.embedding_size,
                     max_seq_len=self.context_size,
+                    dtype=self.dtype,
                 )
             case "latte-wrap":
                 return SelfAttention(
                     attention_fn=_latte,
                     num_heads=self.num_heads,
                     dropout_rate=self.dropout,
+                    dtype=self.dtype,
                 )
             case "standard":
                 return CausalSelfAttention(
@@ -87,6 +97,7 @@ class TransformerBlock(nn.Module):
                     embedding_size=self.embedding_size,
                     context_size=self.context_size,
                     dropout=self.dropout,
+                    dtype=self.dtype,
                 )
             case _ as unreachable:
                 assert_never(unreachable)
@@ -97,15 +108,16 @@ class TransformerBlock(nn.Module):
         x: Array,
         deterministic: bool,
     ) -> jax.Array:
-        attention_ln = nn.LayerNorm(use_bias=False, use_scale=False)
+        attention_ln = nn.LayerNorm(use_bias=False, use_scale=False, dtype=self.dtype)
         attention = self.attention_module()
 
-        feedforward_ln = nn.LayerNorm(use_bias=False, use_scale=False)
+        feedforward_ln = nn.LayerNorm(use_bias=False, use_scale=False, dtype=self.dtype)
         feedforward = MLP(
             embedding_size=self.embedding_size,
             hidden_size=4 * self.embedding_size,
             dropout=self.dropout,
             use_bias=True,
+            dtype=self.dtype,
         )
 
         x = x + attention(attention_ln(x), deterministic=deterministic)
@@ -118,6 +130,8 @@ class MLP(nn.Module):
     hidden_size: int
     dropout: float = 0.0
     use_bias: bool = True
+
+    dtype: DTypeLike = jnp.float32
 
     @nn.compact
     def __call__(  # pyright: ignore [reportIncompatibleMethodOverride]
@@ -132,6 +146,7 @@ class MLP(nn.Module):
         hidden = nn.Dense(
             features=self.hidden_size,
             use_bias=self.use_bias,
+            dtype=self.dtype,
         )(
             x
         )  # (B, T, 4 * D)
@@ -139,6 +154,7 @@ class MLP(nn.Module):
         output = nn.Dense(
             features=self.embedding_size,
             use_bias=self.use_bias,
+            dtype=self.dtype,
         )(
             nn.gelu(hidden)
         )  # (B, T, 4 * D)
@@ -154,8 +170,9 @@ class CausalLatentAttention(nn.Module):
     num_heads: int = 4
     hidden_dim: int = 128
     max_seq_len: int = 2000
-
     dropout: float = 0.0
+
+    dtype: DTypeLike = jnp.float32
 
     def setup(self) -> None:
         assert self.hidden_dim % self.num_heads == 0, (self.hidden_dim, self.num_heads)
@@ -163,10 +180,10 @@ class CausalLatentAttention(nn.Module):
         # Key, query, value projections for all heads (Wq, Wk, Wv matrices) packed together
         self.w = self.param(
             "w",
-            jax.nn.initializers.lecun_normal(),
+            jax.nn.initializers.lecun_normal(dtype=self.dtype),
             (3 * self.hidden_dim, self.hidden_dim),
         )  # (D, 3 * D)
-        self.output_projection = nn.Dense(self.hidden_dim, use_bias=False)
+        self.output_projection = nn.Dense(self.hidden_dim, use_bias=False, dtype=self.dtype)
 
         # Regularization
         self.attention_dropout = nn.Dropout(self.dropout)
@@ -198,7 +215,7 @@ class CausalLatentAttention(nn.Module):
         k = k.reshape(B, T, num_heads, L).transpose(1, 0, 2, 3)  # (T, B, Hn, L)
         v = v.reshape(B, T, num_heads, L).transpose(1, 0, 2, 3)  # (T, B, Hn, L)
 
-        scale = jax.lax.rsqrt(jnp.float32(L))
+        scale = jax.lax.rsqrt(jnp.array(L).astype(self.dtype))
         # scale = 1.0
 
         k_exp = jnp.exp(k * scale) + 1e-6  # (T, B, Hn, L)
@@ -208,7 +225,7 @@ class CausalLatentAttention(nn.Module):
         qs = self.attention_dropout(qs, deterministic=deterministic)
         _, y = jax.lax.scan(
             self.accumulate,
-            init=jnp.zeros((B, num_heads, L, L)),
+            init=jnp.zeros((B, num_heads, L, L), dtype=self.dtype),
             xs=(qs, k_exp, v),
             unroll=512,
         )
@@ -231,7 +248,6 @@ class CausalLatentAttention(nn.Module):
 
         qs_t = jnp.expand_dims(qs_t, -2)  # (B, Hn, L) -> (B, Hn, 1, L)
         y = jax.lax.batch_matmul(qs_t, carry).squeeze()  # (B, Hn, L)
-
         return (carry, y)  # (B, Hn, L, L), (B, Hn, L)
 
 
@@ -241,6 +257,8 @@ class CausalSelfAttention(nn.Module):
     context_size: int
     dropout: float
 
+    dtype: DTypeLike = jnp.float32
+
     @nn.compact
     def __call__(  # pyright: ignore [reportIncompatibleMethodOverride]
         self,
@@ -248,18 +266,18 @@ class CausalSelfAttention(nn.Module):
         deterministic: bool,
     ):
         # key, query, value projections for all heads, but in a batch
-        c_attn = nn.Dense(3 * self.embedding_size, use_bias=False)
+        c_attn = nn.Dense(3 * self.embedding_size, use_bias=False, dtype=self.dtype)
         # output projection
-        c_proj = nn.Dense(self.embedding_size, use_bias=False)
+        c_proj = nn.Dense(self.embedding_size, use_bias=False, dtype=self.dtype)
 
         # regularization
         attn_dropout = nn.Dropout(rate=self.dropout, deterministic=deterministic)
         resid_dropout = nn.Dropout(rate=self.dropout, deterministic=deterministic)
 
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        bias = jnp.tril(jnp.ones(shape=(self.context_size, self.context_size))).reshape(
-            1, 1, self.context_size, self.context_size
-        )
+        bias = jnp.tril(
+            jnp.ones(shape=(self.context_size, self.context_size), dtype=self.dtype)
+        ).reshape(1, 1, self.context_size, self.context_size)
 
         B, T, L = x.shape  # batch size, sequence length, embedding dimensionality (n_embd)
 

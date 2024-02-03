@@ -14,10 +14,11 @@ dependencies = [
     "wandb>=0.16.2",
     "tiktoken>=0.5.2",
     "simple-parsing>=0.1.4",
+    "torch>=2.2.0",
 ]
 
 [tool.pdm]
-package-type = "application"
+distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = [
@@ -35,6 +36,11 @@ name = "jax"
 url = "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
 verify_ssl = true
 type = "find_links"
+
+[[tool.pdm.source]]
+name = "torch"
+url = "https://download.pytorch.org/whl/cpu"
+include_packages = ["torch"]
 
 [tool.pdm.scripts]
 prepare-tiny-stories = { call = "latte.datasets.tiny_stories:prepare" }
