@@ -1,8 +1,10 @@
 import dataclasses
+import multiprocessing
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from functools import partial
+from os import PathLike
+from pathlib import Path
 from typing import Any, Literal
 
 import flax
@@ -11,18 +13,22 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+import orbax.checkpoint
 import tiktoken
 import wandb
-from flax.core.frozen_dict import FrozenDict
+from flax.core.frozen_dict import FrozenDict, freeze
 from jax import Array
 from numpy.typing import NDArray
 from optax._src.base import GradientTransformation
 from simple_parsing import parse as parse_args
 from simple_parsing.wrappers.field_wrapper import DashVariant
+from torch.utils.data import DataLoader, Dataset
 
 from .model import Transformer
 
 GPT2_TOKENIZER = tiktoken.get_encoding("gpt2")
+
+# JAX_DISABLE_JIT=True
 
 
 @dataclass
@@ -40,17 +46,29 @@ class Arguments:
     # # Which type of tokenizer to train
     # kind: TokenizerKind = TokenizerKind.WORD_PIECE
 
-    # Number of layers in the tranfomer
+    # Number of layers in the transformer
     num_layers: int = 2
+
+    # Dtype
+    dtype: str = "float32"
 
     # Number of heads in multihead attention
     num_heads: int = 4
+
+    # # Checkpoint
+    # checkpoint_dir: Path =
 
     # Embedding size
     embedding_size: int = 256
 
     # Context length in number of tokens
     context_size: int = 1024
+
+    # Sample length in number of tokens
+    num_samples: int = 4
+
+    # Sample length in number of tokens
+    sample_size: int = 64
 
     # Batch size
     batch_size: int = 16
@@ -67,11 +85,17 @@ class Arguments:
     # Number of training iterations
     num_warmup_iters: int = 100
 
+    # Number of workers for torch.data.DataLoader
+    num_loader_workers: int = 4
+
     # Log to wandb
     wandb: bool = False
 
     # Number of training iterations
     wandb_project: str = "latte"
+
+    # Name of wandb run
+    wandb_run_name: str | None = None
 
     # Number of training iterations
     attention_type: Literal["latte", "latte-wrap", "standard"] = "latte"
@@ -87,19 +111,33 @@ def sample(
     apply_fn: Callable,
     weights: dict,
     num_samples: int,
-    sample_length: int,
+    sample_size: int,
     key: Array,
-):
-    indices = jnp.expand_dims(jnp.repeat(jnp.array(GPT2_TOKENIZER.eot_token), num_samples), -1)
+) -> Array:
+    def sample_next_token(
+        token_index: int,
+        indices_and_key: tuple[jax.Array, jax.Array],
+    ) -> tuple[jax.Array, jax.Array]:
+        (indices, key) = indices_and_key
 
-    for num_token in range(sample_length):
         (logits, _) = apply_fn(weights, indices=indices, deterministic=True)
 
         key, key_generation = jax.random.split(key)
-        next_indices = jax.random.categorical(key_generation, logits[:, -1:, :], axis=-1)
-        indices = jnp.hstack([indices, next_indices])
+        next_indices = jax.random.categorical(
+            key_generation, logits[:, token_index - 1, :], axis=-1
+        ).astype(jnp.uint16)
 
-    print("\n".join(GPT2_TOKENIZER.decode_batch(indices.tolist())))
+        indices = indices.at[:, token_index].set(next_indices)
+        return (indices, key)
+
+    sample = jnp.full((num_samples, sample_size), fill_value=GPT2_TOKENIZER.eot_token)
+    (indices, _) = jax.lax.fori_loop(
+        lower=1,
+        upper=sample_size,
+        body_fun=sample_next_token,
+        init_val=(sample, key),
+    )
+    return indices
 
 
 class TrainState(flax.struct.PyTreeNode):
@@ -110,7 +148,7 @@ class TrainState(flax.struct.PyTreeNode):
     weights: FrozenDict[str, Any]
     optimizer_state: optax.OptState
 
-    def apply_gradients(self, *, grads, **kwargs):
+    def apply_gradients(self, *, grads: Array, **kwargs):
         updates, new_optimizer_state = self.optimizer.update(
             grads,
             self.optimizer_state,
@@ -146,7 +184,6 @@ class TrainState(flax.struct.PyTreeNode):
         )
 
 
-@jax.jit
 def train_step(train_state: TrainState, inputs: Array, targets: Array) -> tuple[TrainState, Array]:
     def loss_fn(weights: FrozenDict[str, Any]):
         (_logits, loss) = train_state.apply_fn(
@@ -182,12 +219,107 @@ def sample_batch(
     return (x, y)
 
 
+@dataclass(frozen=True)
+class Datapoint:
+    # S = sequence length
+    inputs: NDArray[np.uint16]  # (S,)
+    targets: NDArray[np.uint16]  # (S,)
+
+
+@dataclass(frozen=True)
+class DatapointBatch:
+    # N = batch size
+    # S = sequence length
+    inputs: NDArray[np.uint16]  # (N, S)
+    targets: NDArray[np.uint16]  # (N, S)
+
+
+class WindowDataset(Dataset[Datapoint]):
+    def __init__(self, tokens: NDArray[np.uint16], window_size: int):
+        assert len(tokens.shape) == 1 and tokens.dtype == np.uint16, (
+            f"Invalid shape {tokens.shape}",
+        )
+        assert window_size > 1, f"Invalid window_size: {window_size}"
+
+        self._tokens = tokens
+        self._window_size = window_size
+
+    def __len__(self) -> int:
+        return len(self._tokens) - self._window_size - 1
+
+    def __getitem__(self, window_index: int) -> Datapoint:
+        inputs = self._tokens[window_index : window_index + self._window_size]
+        targets = self._tokens[window_index + 1 : window_index + self._window_size + 1]
+        return Datapoint(inputs, targets)
+
+    @staticmethod
+    def collate(datapoints: Sequence[Datapoint]) -> DatapointBatch:
+        return DatapointBatch(
+            np.stack([datapoint.inputs for datapoint in datapoints]),
+            np.stack([datapoint.targets for datapoint in datapoints]),
+        )
+
+
+class WindowDataset2(Dataset[Datapoint]):
+    def __init__(self, path: PathLike, window_size: int):
+        assert window_size > 1, f"Invalid window_size: {window_size}"
+
+        self._path = path
+        self._tokens = None
+        self._window_size = window_size
+
+    def _get_tokens(self) -> NDArray[np.uint16]:
+        # Lazily mmap the file with tokens
+        if self._tokens is None:
+            self._tokens = np.memmap(self._path, dtype="<u2", mode="r")
+            assert len(self._tokens.shape) == 1 and self._tokens.dtype == np.uint16, (
+                f"Invalid shape {self._tokens.shape}",
+            )
+        return self._tokens
+
+    def __len__(self) -> int:
+        return len(self._get_tokens()) - self._window_size - 1
+
+    def __getitem__(self, window_index: int) -> Datapoint:
+        tokens = self._get_tokens()
+        inputs = tokens[window_index : window_index + self._window_size]
+        targets = tokens[window_index + 1 : window_index + self._window_size + 1]
+        return Datapoint(inputs, targets)
+
+    @staticmethod
+    def collate(datapoints: Sequence[Datapoint]) -> DatapointBatch:
+        return DatapointBatch(
+            np.stack([datapoint.inputs for datapoint in datapoints]),
+            np.stack([datapoint.targets for datapoint in datapoints]),
+        )
+
+
+def create_data_loader(
+    # tokens: NDArray[np.uint16],
+    path: Path,
+    batch_size: int,
+    context_size: int,
+    num_workers: int,
+) -> DataLoader[Datapoint]:
+    return DataLoader(
+        # dataset=WindowDataset(tokens=tokens, window_size=context_size),
+        dataset=WindowDataset2(path=path, window_size=context_size),
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=WindowDataset.collate,
+        num_workers=num_workers,
+        prefetch_factor=4 if num_workers > 0 else None,
+        multiprocessing_context=multiprocessing.get_context("spawn") if num_workers > 0 else None,
+    )
+
+
 def main():
     args = parse_args(
         Arguments,
         prog="train",
         add_option_string_dash_variants=DashVariant.DASH,
     )
+    print(args)
 
     model = Transformer(
         attention_type=args.attention_type,
@@ -196,17 +328,25 @@ def main():
         num_embeddings=GPT2_TOKENIZER.n_vocab,
         embedding_size=args.embedding_size,
         context_size=args.context_size,
+        dtype=args.dtype,
     )
 
     key, key_weights, key_validation = jax.random.split(jax.random.key(0), num=3)
-    weights = model.init(
+    initial_weights = jax.jit(model.init)(
         key_weights,
         jnp.empty((args.batch_size, args.context_size), dtype=jnp.uint16),
         deterministic=False,
     )
 
-    weight_shapes = jax.tree_util.tree_map(lambda x: x.shape, weights)
+    weight_shapes = jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), initial_weights)
     print(f"Weight shapes: {weight_shapes}")
+
+    num_parameters = jax.tree_util.tree_reduce(
+        lambda num_elems, x: num_elems + int(np.prod(x.shape)),
+        tree=initial_weights,
+        initializer=0,
+    )
+    print(f"Model has {num_parameters} parameters")
 
     learning_rate_schedule = optax.join_schedules(
         schedules=(
@@ -228,71 +368,112 @@ def main():
         optax.adamw(learning_rate=learning_rate_schedule, weight_decay=args.weight_decay),
     )
 
-    # data
-    train_data = np.memmap("datasets/tiny-stories/train.bin", dtype="<u2", mode="r")
-    validation_data = np.memmap("datasets/tiny-stories/val.bin", dtype="<u2", mode="r")
+    print("Creating train state")
+    model_apply_fn = jax.jit(model.apply)
+    # sample_fn = jax.jit(partial(sample, apply_fn=model_apply_fn))
+    sample_fn = jax.jit(sample, static_argnames=["apply_fn", "sample_size", "num_samples"])
+    # sample_fn = sample
+    train_step_fn = jax.jit(train_step)
 
-    assert isinstance(weights, FrozenDict), type(weights)
     train_state = TrainState.create(
-        apply_fn=model.apply,
-        weights=weights,
+        apply_fn=model_apply_fn,
+        weights=freeze(initial_weights),
         optimizer=optimizer,
     )
+    # We access the model weights only via train_state
+    del initial_weights
 
+    # Mmap train and validation data and create data loaders
+    print("Mmaping training data")
+    # train_mmap = np.memmap("datasets/tiny-stories/train.bin", dtype="<u2", mode="r")
+    train_data = iter(
+        create_data_loader(
+            # tokens=train_mmap,
+            path=Path("datasets/tiny-stories/train.bin"),
+            context_size=args.context_size,
+            batch_size=args.batch_size,
+            num_workers=args.num_loader_workers,
+        )
+    )
+
+    # validation_mmap = np.memmap("datasets/tiny-stories/val.bin", dtype="<u2", mode="r")
+    validation_data = iter(
+        create_data_loader(
+            # tokens=validation_mmap,
+            path=Path("datasets/tiny-stories/val.bin"),
+            context_size=args.context_size,
+            batch_size=args.batch_size,
+            num_workers=args.num_loader_workers,
+        )
+    )
+
+    # Init wandb
     if args.wandb:
         wandb.init(
             project=args.wandb_project,
-            # name=wandb_run_name,
+            name=args.wandb_run_name,
             config=dataclasses.asdict(args),
         )
 
-    model_apply_fn = jax.jit(model.apply)
-
-    sample_train_batch = partial(
-        sample_batch,
-        indices=train_data,
-        batch_size=args.batch_size,
-        context_size=args.context_size,
+    checkpoint_options = orbax.checkpoint.CheckpointManagerOptions(
+        create=True,
+        max_to_keep=2,
     )
-    sample_validation_batch = partial(
-        sample_batch,
-        indices=validation_data,
-        batch_size=args.batch_size,
-        context_size=args.context_size,
+    checkpoint_manager = orbax.checkpoint.CheckpointManager(
+        directory=Path("checkpoints").absolute(),
+        item_names=("state", "metadata"),
+        options=checkpoint_options,
     )
 
     start_time = time.time()
+    print("Starting training loop")
     for num_iter in range(args.num_iters):
         key, key_train_batch = jax.random.split(key, num=2)
 
-        (x, y) = sample_train_batch(key=key_train_batch)
-        train_state, train_loss = train_step(train_state, x, y)
+        batch = next(train_data)
+        train_state, train_loss = train_step_fn(train_state, batch.inputs, batch.targets)
 
         end_time = time.time()
-        if num_iter % 10 == 0:
+        if num_iter % 20 == 0:
             took_ms = int(1000.0 * (end_time - start_time))
 
-            val_loss = None
+            val_loss, generations_table = None, None
             if num_iter % 200 == 0:
                 key_validation, key_validation_batch, key_sample = jax.random.split(
                     key_validation, num=3
                 )
 
-                (x_val, y_val) = sample_validation_batch(key=key_validation_batch)
+                val_batch = next(validation_data)
                 (_, val_loss) = train_state.apply_fn(
                     train_state.weights,
-                    indices=x_val,
-                    targets=y_val,
+                    indices=val_batch.inputs,
+                    targets=val_batch.targets,
                     deterministic=True,
                 )
 
-                sample(
+                sample_indices = sample_fn(
                     apply_fn=model_apply_fn,
                     weights=train_state.weights,
-                    num_samples=4,
-                    sample_length=50,
+                    num_samples=args.num_samples,
+                    sample_size=args.sample_size,
                     key=key_sample,
                 )
+
+                generations = GPT2_TOKENIZER.decode_batch(sample_indices.tolist())
+                print("\n".join(generations))
+                generations_table = wandb.Table(
+                    columns=["generation"],
+                    data=[[generation] for generation in generations],
+                )
+
+                checkpoint_manager.save(
+                    num_iter,
+                    args=orbax.checkpoint.args.Composite(
+                        state=orbax.checkpoint.args.StandardSave(train_state),
+                        metadata=orbax.checkpoint.args.JsonSave(dataclasses.asdict(args)),
+                    ),
+                )
+                # checkpoint_manager.wait_until_finished()
 
             learning_rate = float(learning_rate_schedule(num_iter))
             metrics = {
@@ -305,6 +486,8 @@ def main():
             }
             if val_loss is not None:
                 metrics["val/loss"] = float(val_loss)
+            if generations_table is not None:
+                metrics["generations"] = generations_table
 
             print(
                 f"[step {num_iter}] loss: {metrics['train/loss']:>6.2}     "
@@ -312,6 +495,7 @@ def main():
                 f"lr: {learning_rate:>6.3}     "
                 f"({took_ms:>8}ms)"
             )
+
             if args.wandb:
                 wandb.log(metrics)
 

@@ -6,18 +6,20 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "datasets>=2.16.1",
-    "flax>=0.7.4",
-    "jax[cuda12_pip]>=0.4.6",
+    "flax>=0.8.1",
+    "jax[cuda12_pip]>=0.4.24",
     "numpy>=1.26.3",
-    "optax>=0.1.8",
+    "optax>=0.1.9",
     "tqdm>=4.66.1",
     "wandb>=0.16.2",
     "tiktoken>=0.5.2",
     "simple-parsing>=0.1.4",
+    "torch>=2.2.0",
+    "orbax>=0.1.9",
 ]
 
 [tool.pdm]
-package-type = "application"
+distribution = false
 
 [tool.pdm.dev-dependencies]
 dev = [
@@ -35,6 +37,11 @@ name = "jax"
 url = "https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
 verify_ssl = true
 type = "find_links"
+
+[[tool.pdm.source]]
+name = "torch"
+url = "https://download.pytorch.org/whl/cpu"
+include_packages = ["torch"]
 
 [tool.pdm.scripts]
 prepare-tiny-stories = { call = "latte.datasets.tiny_stories:prepare" }

@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:8057d6acaa10218ee272ad6f8d1192671db05484c8ee911535e9f947c352f3ca"
+content_hash = "sha256:b581023de1712d3730cff78a2370ecaf30c35cd79cc0cd622cfe931644f27ad2"
 
 [[package]]
 name = "absl-py"
@@ -378,7 +378,7 @@ files = [
 
 [[package]]
 name = "flax"
-version = "0.8.0"
+version = "0.8.1"
 requires_python = ">=3.9"
 summary = "Flax: A neural network library for JAX designed for flexibility"
 groups = ["default"]
@@ -395,8 +395,8 @@ dependencies = [
     "typing-extensions>=4.2",
 ]
 files = [
-    {file = "flax-0.8.0-py3-none-any.whl", hash = "sha256:945fdf051895f52a81adc46b7bb6640cdd32aaa759428f0fcb6a2e519a46e8bb"},
-    {file = "flax-0.8.0.tar.gz", hash = "sha256:8fb87a6b2447ec419ecd7afc2e5bdad0ecab00cdd9d7a2cb591edf385040c745"},
+    {file = "flax-0.8.1-py3-none-any.whl", hash = "sha256:8cf9ef11859eef252470377556a8cc48db287fc6647407ab34f1fc01461925dd"},
+    {file = "flax-0.8.1.tar.gz", hash = "sha256:ce3d99e9b4c0d2e4d9fc28bc56cced8ba953adfd695aabd24f096b4c8a7e2f92"},
 ]
 
 [[package]]
@@ -573,7 +573,7 @@ files = [
 
 [[package]]
 name = "jax"
-version = "0.4.23"
+version = "0.4.24"
 requires_python = ">=3.9"
 summary = "Differentiate, compile, and transform Numpy code."
 groups = ["default"]
@@ -585,20 +585,20 @@ dependencies = [
     "scipy>=1.9",
 ]
 files = [
-    {file = "jax-0.4.23-py3-none-any.whl", hash = "sha256:a7a07ccd1577111e3b82378c79a8ed0f9d6613b1e98fb6bf3c0b459198f73eaa"},
-    {file = "jax-0.4.23.tar.gz", hash = "sha256:2a229a5a758d1b803891b2eaed329723f6b15b4258b14dc0ccb1498c84963685"},
+    {file = "jax-0.4.24-py3-none-any.whl", hash = "sha256:4ff1cde9585c95d00b397e20d53680d13d951df7248ec7136d13b4e2000348b6"},
+    {file = "jax-0.4.24.tar.gz", hash = "sha256:4a6b6fd026ddd22653c7fa2fac1904c3de2dbe845b61ede08af9a5cc709662ae"},
 ]
 
 [[package]]
 name = "jax"
-version = "0.4.23"
+version = "0.4.24"
 extras = ["cuda12_pip"]
 requires_python = ">=3.9"
 summary = "Differentiate, compile, and transform Numpy code."
 groups = ["default"]
 dependencies = [
-    "jax==0.4.23",
-    "jaxlib==0.4.23+cuda12.cudnn89",
+    "jax==0.4.24",
+    "jaxlib==0.4.24+cuda12.cudnn89",
     "nvidia-cublas-cu12>=12.2.5.6",
     "nvidia-cuda-cupti-cu12>=12.2.142",
     "nvidia-cuda-nvcc-cu12>=12.2.140",
@@ -607,17 +607,17 @@ dependencies = [
     "nvidia-cufft-cu12>=11.0.8.103",
     "nvidia-cusolver-cu12>=11.5.2",
     "nvidia-cusparse-cu12>=12.1.2.141",
-    "nvidia-nccl-cu12>=2.18.3",
+    "nvidia-nccl-cu12>=2.19.3",
     "nvidia-nvjitlink-cu12>=12.2",
 ]
 files = [
-    {file = "jax-0.4.23-py3-none-any.whl", hash = "sha256:a7a07ccd1577111e3b82378c79a8ed0f9d6613b1e98fb6bf3c0b459198f73eaa"},
-    {file = "jax-0.4.23.tar.gz", hash = "sha256:2a229a5a758d1b803891b2eaed329723f6b15b4258b14dc0ccb1498c84963685"},
+    {file = "jax-0.4.24-py3-none-any.whl", hash = "sha256:4ff1cde9585c95d00b397e20d53680d13d951df7248ec7136d13b4e2000348b6"},
+    {file = "jax-0.4.24.tar.gz", hash = "sha256:4a6b6fd026ddd22653c7fa2fac1904c3de2dbe845b61ede08af9a5cc709662ae"},
 ]
 
 [[package]]
 name = "jaxlib"
-version = "0.4.23+cuda12.cudnn89"
+version = "0.4.24+cuda12.cudnn89"
 requires_python = ">=3.9"
 summary = "XLA library for JAX"
 groups = ["default"]
@@ -627,8 +627,8 @@ dependencies = [
     "scipy>=1.9",
 ]
 files = [
-    {file = "jaxlib-0.4.23+cuda12.cudnn89-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:6d0be32097511a2bf5ae308e6db74c0d12d4c056d8e670ec2e1aae0dfe1e83f5"},
-    {file = "jaxlib-0.4.23+cuda12.cudnn89-cp311-cp311-manylinux2014_x86_64.whl", hash = "sha256:74c51c4671e397c37251e3b73f5c7b08d805d2200714a23352d1e1fbf08d928c"},
+    {file = "jaxlib-0.4.24+cuda12.cudnn89-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:7bfe74895a947a46bd3aa571abeab1612eb23e3d6c47ba71254e8b265ccbedf2"},
+    {file = "jaxlib-0.4.24+cuda12.cudnn89-cp311-cp311-manylinux2014_x86_64.whl", hash = "sha256:229cb7be4d72529969373102005b7adda3888601168171bb864a1e4c893d6d04"},
 ]
 
 [[package]]
@@ -646,6 +646,20 @@ files = [
 ]
 
 [[package]]
+name = "jinja2"
+version = "3.1.3"
+requires_python = ">=3.7"
+summary = "A very fast and expressive template engine."
+groups = ["default"]
+dependencies = [
+    "MarkupSafe>=2.0",
+]
+files = [
+    {file = "Jinja2-3.1.3-py3-none-any.whl", hash = "sha256:7d6d50dd97d52cbc355597bd845fabfbac3f551e1f99619e39a35ce8c370b5fa"},
+    {file = "Jinja2-3.1.3.tar.gz", hash = "sha256:ac8bd6544d4bb2c9792bf3a159e80bba8fda7f07e81bc3aed565432d5925ba90"},
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 requires_python = ">=3.8"
@@ -657,6 +671,26 @@ dependencies = [
 files = [
     {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
     {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
+]
+
+[[package]]
+name = "markupsafe"
+version = "2.1.5"
+requires_python = ">=3.7"
+summary = "Safely add untrusted strings to HTML/XML markup."
+groups = ["default"]
+files = [
+    {file = "MarkupSafe-2.1.5-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:629ddd2ca402ae6dbedfceeba9c46d5f7b2a61d9749597d4307f943ef198fc1f"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:5b7b716f97b52c5a14bffdf688f971b2d5ef4029127f1ad7a513973cfd818df2"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6ec585f69cec0aa07d945b20805be741395e28ac1627333b1c5b0105962ffced"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b91c037585eba9095565a3556f611e3cbfaa42ca1e865f7b8015fe5c7336d5a5"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7502934a33b54030eaf1194c21c692a534196063db72176b0c4028e140f8f32c"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:0e397ac966fdf721b2c528cf028494e86172b4feba51d65f81ffd65c63798f3f"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:c061bb86a71b42465156a3ee7bd58c8c2ceacdbeb95d05a99893e08b8467359a"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:3a57fdd7ce31c7ff06cdfbf31dafa96cc533c21e443d57f5b1ecc6cdc668ec7f"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-win32.whl", hash = "sha256:397081c1a0bfb5124355710fe79478cdbeb39626492b15d399526ae53422b906"},
+    {file = "MarkupSafe-2.1.5-cp311-cp311-win_amd64.whl", hash = "sha256:2b7c57a4dfc4f16f7142221afe5ba4e093e09e728ca65c51f5620c9aaeb9a617"},
+    {file = "MarkupSafe-2.1.5.tar.gz", hash = "sha256:d283d37a890ba4c1ae73ffadf8046435c76e7bc2247bbb63c00bd1a709c6544b"},
 ]
 
 [[package]]
@@ -712,6 +746,16 @@ files = [
     {file = "ml_dtypes-0.3.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2c34f2ba9660b21fe1034b608308a01be82bbef2a92fb8199f24dc6bad0d5226"},
     {file = "ml_dtypes-0.3.2-cp311-cp311-win_amd64.whl", hash = "sha256:6604877d567a29bfe7cc02969ae0f2425260e5335505cf5e7fefc3e5465f5655"},
     {file = "ml_dtypes-0.3.2.tar.gz", hash = "sha256:533059bc5f1764fac071ef54598db358c167c51a718f68f5bb55e3dee79d2967"},
+]
+
+[[package]]
+name = "mpmath"
+version = "1.3.0"
+summary = "Python library for arbitrary-precision floating-point arithmetic"
+groups = ["default"]
+files = [
+    {file = "mpmath-1.3.0-py3-none-any.whl", hash = "sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c"},
+    {file = "mpmath-1.3.0.tar.gz", hash = "sha256:7a28eb2a9774d00c7bc92411c19a89209d5da7c4c9a9e227be8330a23a25b91f"},
 ]
 
 [[package]]
@@ -804,6 +848,17 @@ groups = ["default"]
 files = [
     {file = "nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c"},
     {file = "nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe"},
+]
+
+[[package]]
+name = "networkx"
+version = "3.2.1"
+requires_python = ">=3.9"
+summary = "Python package for creating and manipulating graphs and networks"
+groups = ["default"]
+files = [
+    {file = "networkx-3.2.1-py3-none-any.whl", hash = "sha256:f18c69adc97877c42332c170849c96cefa91881c99a7cb3e95b7c659ebdc1ec2"},
+    {file = "networkx-3.2.1.tar.gz", hash = "sha256:9f1bb5cf3409bf324e0a722c20bdb4c20ee39bf1c30ce8ae499c8502b0b5e0c6"},
 ]
 
 [[package]]
@@ -989,8 +1044,8 @@ files = [
 
 [[package]]
 name = "optax"
-version = "0.1.8"
-requires_python = ">=3.8"
+version = "0.1.9"
+requires_python = ">=3.9"
 summary = "A gradient processing and optimisation library in JAX."
 groups = ["default"]
 dependencies = [
@@ -1001,8 +1056,20 @@ dependencies = [
     "numpy>=1.18.0",
 ]
 files = [
-    {file = "optax-0.1.8-py3-none-any.whl", hash = "sha256:9a76a895511a1d9b50078c55e9fffd7f095e5e947d4c804eead7f3dc51c5c270"},
-    {file = "optax-0.1.8.tar.gz", hash = "sha256:86820fba48c564bd6772be4f168895cdad8d8b75e45fc414e63ccfc223628c34"},
+    {file = "optax-0.1.9-py3-none-any.whl", hash = "sha256:3cbcfac6e70dff9484cd7560dc92e43a50df1eac0d4af2a1f7c2e1fd116bf972"},
+    {file = "optax-0.1.9.tar.gz", hash = "sha256:731f43e8b404f50a5ef025b1261894d7d0300f7ad9cb688ea08f67b40822e94f"},
+]
+
+[[package]]
+name = "orbax"
+version = "0.1.9"
+summary = "Orbax"
+groups = ["default"]
+dependencies = [
+    "orbax-checkpoint>=0.1.8",
+]
+files = [
+    {file = "orbax-0.1.9.tar.gz", hash = "sha256:42dd487ceef9fbf027f4720f3d041686af75120466a528a8a8141226bc197218"},
 ]
 
 [[package]]
@@ -1489,6 +1556,20 @@ files = [
 ]
 
 [[package]]
+name = "sympy"
+version = "1.12"
+requires_python = ">=3.8"
+summary = "Computer algebra system (CAS) in Python"
+groups = ["default"]
+dependencies = [
+    "mpmath>=0.19",
+]
+files = [
+    {file = "sympy-1.12-py3-none-any.whl", hash = "sha256:c3588cd4295d0c0f603d0f2ae780587e64e2efeedb3521e46b9bb1d08d184fa5"},
+    {file = "sympy-1.12.tar.gz", hash = "sha256:ebf595c8dac3e0fdc4152c51878b498396ec7f30e7a914d6071e674d49420fb8"},
+]
+
+[[package]]
 name = "tensorstore"
 version = "0.1.52"
 requires_python = ">=3.9"
@@ -1536,6 +1617,28 @@ groups = ["default"]
 files = [
     {file = "toolz-0.12.1-py3-none-any.whl", hash = "sha256:d22731364c07d72eea0a0ad45bafb2c2937ab6fd38a3507bf55eae8744aa7d85"},
     {file = "toolz-0.12.1.tar.gz", hash = "sha256:ecca342664893f177a13dac0e6b41cbd8ac25a358e5f215316d43e2100224f4d"},
+]
+
+[[package]]
+name = "torch"
+version = "2.2.0"
+requires_python = ">=3.8.0"
+summary = "Tensors and Dynamic neural networks in Python with strong GPU acceleration"
+groups = ["default"]
+dependencies = [
+    "filelock",
+    "fsspec",
+    "jinja2",
+    "networkx",
+    "sympy",
+    "typing-extensions>=4.8.0",
+]
+files = [
+    {file = "torch-2.2.0+cpu-cp311-cp311-linux_x86_64.whl", hash = "sha256:2a8ff4440c1f024ad7982018c378470d2ae0a72f2bc269a22b1a677e09bdd3b1"},
+    {file = "torch-2.2.0+cpu-cp311-cp311-win_amd64.whl", hash = "sha256:58194066e594cd8aff27ddb746399d040900cc0e8a331d67ea98499777fa4d31"},
+    {file = "torch-2.2.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4d819ad23591e0cd8a3c0b740d84eaae6fd09928cf2cadcebde8ae605ac2db8b"},
+    {file = "torch-2.2.0-cp311-none-macosx_10_9_x86_64.whl", hash = "sha256:c82a7c10da1bac5a319568671dc7bbf8f7b17c551fc233e5a80803bab9ef0d04"},
+    {file = "torch-2.2.0-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:a9b1af4fdda3b2b4824e5f12333d7dbd2279130241586972d96aceb98b44ac9b"},
 ]
 
 [[package]]
