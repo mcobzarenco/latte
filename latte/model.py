@@ -181,6 +181,7 @@ class CausalLatentAttention(nn.Module):
         self.w = self.param(
             "w",
             jax.nn.initializers.lecun_normal(dtype=self.dtype),
+            # jax.nn.initializers.lecun_normal(dtype=jnp.float32),
             (3 * self.hidden_dim, self.hidden_dim),
         )  # (D, 3 * D)
         self.output_projection = nn.Dense(self.hidden_dim, use_bias=False, dtype=self.dtype)
@@ -227,7 +228,7 @@ class CausalLatentAttention(nn.Module):
             self.accumulate,
             init=jnp.zeros((B, num_heads, L, L), dtype=self.dtype),
             xs=(qs, k_exp, v),
-            unroll=512,
+            unroll=128,
         )
         y = y.reshape(T, B, D).transpose((1, 0, 2))  # (T, B, D)
 

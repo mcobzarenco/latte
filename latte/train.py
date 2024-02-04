@@ -49,9 +49,6 @@ class Arguments:
     # Dtype
     dtype: str = "float32"
 
-    # Whether to jit the jax functions
-    jit: bool = True
-
     # Number of heads in multihead attention
     num_heads: int = 4
 
@@ -65,7 +62,7 @@ class Arguments:
     num_samples: int = 4
 
     # Sample length in number of tokens
-    sample_size: int = 32
+    sample_size: int = 64
 
     # Batch size
     batch_size: int = 16
@@ -91,6 +88,9 @@ class Arguments:
     # Number of training iterations
     wandb_project: str = "latte"
 
+    # Name of wandb run
+    wandb_run_name: str | None = None
+
     # Number of training iterations
     attention_type: Literal["latte", "latte-wrap", "standard"] = "latte"
 
@@ -101,23 +101,56 @@ class Arguments:
     verbose: bool = False
 
 
+# def sample(
+#     apply_fn: Callable,
+#     weights: dict,
+#     num_samples: int,
+#     sample_size: int,
+#     key: Array,
+# ):
+#     indices = jnp.expand_dims(jnp.repeat(jnp.array(GPT2_TOKENIZER.eot_token), num_samples), -1)
+
+#     for _ in range(sample_size):
+#         (logits, _) = apply_fn(weights, indices=indices, deterministic=True)
+
+#         key, key_generation = jax.random.split(key)
+#         next_indices = jax.random.categorical(key_generation, logits[:, -1:, :], axis=-1)
+#         indices = jnp.hstack([indices, next_indices])
+
+#     print("\n".join(GPT2_TOKENIZER.decode_batch(indices.tolist())))
+
+
 def sample(
     apply_fn: Callable,
     weights: dict,
     num_samples: int,
     sample_size: int,
     key: Array,
-):
-    indices = jnp.expand_dims(jnp.repeat(jnp.array(GPT2_TOKENIZER.eot_token), num_samples), -1)
+) -> Array:
+    def sample_next_token(
+        token_index: int,
+        indices_and_key: tuple[jax.Array, jax.Array],
+    ) -> tuple[jax.Array, jax.Array]:
+        (indices, key) = indices_and_key
 
-    for _ in range(sample_size):
         (logits, _) = apply_fn(weights, indices=indices, deterministic=True)
 
         key, key_generation = jax.random.split(key)
-        next_indices = jax.random.categorical(key_generation, logits[:, -1:, :], axis=-1)
-        indices = jnp.hstack([indices, next_indices])
+        next_indices = jax.random.categorical(
+            key_generation, logits[:, token_index - 1, :], axis=-1
+        ).astype(jnp.uint16)
 
-    print("\n".join(GPT2_TOKENIZER.decode_batch(indices.tolist())))
+        indices = indices.at[:, token_index].set(next_indices)
+        return (indices, key)
+
+    sample = jnp.full((num_samples, sample_size), fill_value=GPT2_TOKENIZER.eot_token)
+    (indices, _) = jax.lax.fori_loop(
+        lower=1,
+        upper=sample_size,
+        body_fun=sample_next_token,
+        init_val=(sample, key),
+    )
+    return indices
 
 
 class TrainState(flax.struct.PyTreeNode):
@@ -259,18 +292,18 @@ def main():
     )
 
     key, key_weights, key_validation = jax.random.split(jax.random.key(0), num=3)
-    weights = model.init(
+    initial_weights = jax.jit(model.init)(
         key_weights,
         jnp.empty((args.batch_size, args.context_size), dtype=jnp.uint16),
         deterministic=False,
     )
 
-    weight_shapes = jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), weights)
+    weight_shapes = jax.tree_util.tree_map(lambda x: (x.shape, x.dtype), initial_weights)
     print(f"Weight shapes: {weight_shapes}")
 
     num_parameters = jax.tree_util.tree_reduce(
         lambda num_elems, x: num_elems + int(np.prod(x.shape)),
-        tree=weights,
+        tree=initial_weights,
         initializer=0,
     )
     print(f"Model has {num_parameters} parameters")
@@ -295,40 +328,34 @@ def main():
         optax.adamw(learning_rate=learning_rate_schedule, weight_decay=args.weight_decay),
     )
 
+    print("Creating train state")
+    model_apply_fn = jax.jit(model.apply)
+    # sample_fn = jax.jit(partial(sample, apply_fn=model_apply_fn))
+    sample_fn = jax.jit(sample, static_argnames=["apply_fn", "sample_size", "num_samples"])
+    # sample_fn = sample
+    train_step_fn = jax.jit(train_step)
+
+    train_state = TrainState.create(
+        apply_fn=model_apply_fn,
+        weights=freeze(initial_weights),
+        optimizer=optimizer,
+    )
+    # We access the model weights only via train_state
+    del initial_weights
+
     # data
     print("Mmaping training data")
     validation_data = np.memmap("datasets/tiny-stories/val.bin", dtype="<u2", mode="r")
 
     train_mmap = np.memmap("datasets/tiny-stories/train.bin", dtype="<u2", mode="r")
-    train_data = iter(create_data_loader(
-        tokens=train_mmap,
-        context_size=args.context_size,
-        batch_size=args.batch_size,
-        num_workers=args.num_loader_workers,
-    ))
-
-    print("Creating train state")
-    train_state = TrainState.create(
-        apply_fn=model.apply,
-        weights=freeze(weights),
-        optimizer=optimizer,
-    )
-
-    if args.wandb:
-        wandb.init(
-            project=args.wandb_project,
-            # name=wandb_run_name,
-            config=dataclasses.asdict(args),
+    train_data = iter(
+        create_data_loader(
+            tokens=train_mmap,
+            context_size=args.context_size,
+            batch_size=args.batch_size,
+            num_workers=args.num_loader_workers,
         )
-
-    model_apply_fn = model.apply
-    train_step_fn = train_step
-    if args.jit:
-        print("Jitting")
-        # import ipdb; ipdb.set_trace()
-
-        # model_apply_fn = jax.jit(model_apply_fn)
-        train_step_fn = jax.jit(train_step_fn)
+    )
 
     # sample_train_batch = partial(
     #     sample_batch,
@@ -342,6 +369,13 @@ def main():
         batch_size=args.batch_size,
         context_size=args.context_size,
     )
+
+    if args.wandb:
+        wandb.init(
+            project=args.wandb_project,
+            name=args.wandb_run_name,
+            config=dataclasses.asdict(args),
+        )
 
     start_time = time.time()
     print("Starting training loop")
@@ -361,8 +395,8 @@ def main():
         if num_iter % 20 == 0:
             took_ms = int(1000.0 * (end_time - start_time))
 
-            val_loss = None
-            if (num_iter + 1) % 5000 == 0:
+            val_loss, generations_table = None, None
+            if num_iter % 200 == 0:
                 key_validation, key_validation_batch, key_sample = jax.random.split(
                     key_validation, num=3
                 )
@@ -375,12 +409,19 @@ def main():
                     deterministic=True,
                 )
 
-                sample(
+                sample_indices = sample_fn(
                     apply_fn=model_apply_fn,
                     weights=train_state.weights,
                     num_samples=args.num_samples,
                     sample_size=args.sample_size,
                     key=key_sample,
+                )
+
+                generations = GPT2_TOKENIZER.decode_batch(sample_indices.tolist())
+                print("\n".join(generations))
+                generations_table = wandb.Table(
+                    columns=["generation"],
+                    data=[[generation] for generation in generations],
                 )
 
             learning_rate = float(learning_rate_schedule(num_iter))
@@ -394,6 +435,8 @@ def main():
             }
             if val_loss is not None:
                 metrics["val/loss"] = float(val_loss)
+            if generations_table is not None:
+                metrics["generations"] = generations_table
 
             print(
                 f"[step {num_iter}] loss: {metrics['train/loss']:>6.2}     "
