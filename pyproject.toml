@@ -44,6 +44,7 @@ include_packages = ["torch"]
 
 [tool.pdm.scripts]
 prepare-tiny-stories = { call = "latte.datasets.tiny_stories:prepare" }
+prepare-openweb = { call = "latte.datasets.openweb:prepare" }
 train = { call = "latte.train:main" }
 
 # preprocess-task-mining-tasks = { call = "latte.preprocess.datasets.task_mining.tasks:main" }

@@ -44,16 +44,16 @@ class Arguments:
     # kind: TokenizerKind = TokenizerKind.WORD_PIECE
 
     # Number of layers in the tranfomer
-    num_layers: int = 2
+    num_layers: int = 12
 
     # Dtype
     dtype: str = "float32"
 
     # Number of heads in multihead attention
-    num_heads: int = 4
+    num_heads: int = 12
 
     # Embedding size
-    embedding_size: int = 256
+    embedding_size: int = 516
 
     # Context length in number of tokens
     context_size: int = 1024
@@ -65,19 +65,19 @@ class Arguments:
     sample_size: int = 64
 
     # Batch size
-    batch_size: int = 16
+    batch_size: int = 4 #16
 
     # Learning rate
-    learning_rate: float = 1e-3
+    learning_rate: float = 6e-4 #1e-3
 
     # Weight decay
     weight_decay: float = 0.01
 
     # Number of training iterations
-    num_iters: int = 10000
+    num_iters: int = 600000
 
     # Number of training iterations
-    num_warmup_iters: int = 100
+    num_warmup_iters: int = 2000
 
     # Number of workers for torch.data.DataLoader
     num_loader_workers: int = 4
@@ -345,9 +345,10 @@ def main():
 
     # data
     print("Mmaping training data")
-    validation_data = np.memmap("datasets/tiny-stories/val.bin", dtype="<u2", mode="r")
-
-    train_mmap = np.memmap("datasets/tiny-stories/train.bin", dtype="<u2", mode="r")
+    #validation_data = np.memmap("datasets/tiny-stories/val.bin", dtype="<u2", mode="r")
+    #train_mmap = np.memmap("datasets/tiny-stories/train.bin", dtype="<u2", mode="r")
+    validation_data = np.memmap("datasets/openweb/val.bin", dtype="<u2", mode="r")
+    train_mmap = np.memmap("datasets/openweb/train.bin", dtype="<u2", mode="r")
     train_data = iter(
         create_data_loader(
             tokens=train_mmap,
